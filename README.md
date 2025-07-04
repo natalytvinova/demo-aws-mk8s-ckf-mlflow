@@ -141,23 +141,6 @@ juju deploy cos-lite --model cos \
 
 To access the COS, go to the section "Access the UIs"
 
-Add the self monitoring the deployed Kuberentes cluster
-
-```bash
-juju consume aws-controller:admin/cos.alertmanager-karma-dashboard cos-alertmanager -m mk8s
-juju consume aws-controller:admin/cos.grafana-dashboards cos-grafana -m mk8s
-juju consume aws-controller:admin/cos.loki-logging cos-loki -m mk8s
-juju consume aws-controller:admin/cos.prometheus-receive-remote-write cos-prometheus -m mk8s
-
-juju deploy grafana-agent grafana-agent-cos --channel latest/stable -m mk8s
-
-juju relate grafana-agent-cos:cos-agent microk8s:cos-agent -m mk8s
-juju relate grafana-agent-cos:cos-agent microk8s-gpu:cos-agent -m mk8s
-juju relate cos-loki:logging grafana-agent-cos:logging-consumer -m mk8s
-juju relate cos-prometheus:receive-remote-write grafana-agent-cos:send-remote-write -m mk8s
-juju relate cos-grafana:grafana-dashboard grafana-agent-cos:grafana-dashboards-provider -m mk8s
-```
-
 Get the IP of the COS entrypoint. In the catalog you can find links to other services.
 
 ```bash
@@ -243,7 +226,7 @@ sh ./opensearch/os-pod-default.sh
 
 Go to the **Kubeflow Dashboard** and create a Kubeflow Notebook with all PodDefaults enabled (Allow access to Kubeflow pipeline, Minio, MLflow, Opensearch).
 
-In the Kubeflow notebook clone this repo and go to the `notebooks` folder. Next, run setup-bucket.ipynb to create bucket and upload all files in the documents folder to it. If you want to have more documents uploaded, change the content of the `documents` folder.
+In the Kubeflow notebook clone this repo and go to the `notebooks` folder. Next, run `setup-bucket.ipynb` to create bucket and upload all files in the documents folder to it. If you want to have more documents uploaded, change the content of the `documents` folder.
 
 Go to the **Kubeflow Pipelines** tab in Kubeflow Dashboard and create the new pipeline. You can download the ingestion-pipelines.yaml file from the repository. Alternativly you can run the `ingestion-pipeline.ipynb`.
 
@@ -253,17 +236,53 @@ To execute the pipeline and create a run, you might need to create experiment fi
 
 Check if KServe works by following the script `kserve-test.sh`. Update the authentication token from your browser.
 
-Before deploying the NIM export the NGC API key.
-
-```bash
-export NGC_API_KEY=...
-```
-
-Configure the nim-kserve integration:
-
 ```bash
 bash ./models/setup.sh
 ```
+
+### Adjusting the model
+
+If you want to make the modifications to the model, follow these steps. For this tutorial we used [Llama model 3.2-1B](https://huggingface.co/meta-llama/Llama-3.2-1B).
+After requesting access to this model, login to Huggingface-cli:
+```commandline
+huggingface-cli login
+```
+
+And load the model:
+```python
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+```
+
+Dockerfile along with the used files are included in the `models/llama-image` directory. Put the llama-model you extracted in the previous steps to `models/llama-image/llama-model` directory. The directory of your image should look like this:
+```commandline
+tree llama-image
+llama-image
+├── Dockerfile
+├── entrypoint.sh
+└── llama-model
+    ├── LICENSE.txt
+    ├── README.md
+    ├── USE_POLICY.md
+    ├── config.json
+    ├── generation_config.json
+    ├── gitattributes
+    ├── model.safetensors
+    ├── special_tokens_map.json
+    ├── tokenizer.json
+    └── tokenizer_config.json
+
+2 directories, 12 files
+```
+
+Build the image and push to your repo:
+
+sudo docker build . -t natalytvinova/llama-vllm:latest
+sudo docker push natalytvinova/llama-vllm:latest
+
+And replace the image in the `models/setup.sh`.
 
 ### Deploy Chat UI
 
@@ -276,10 +295,11 @@ bash ./ui/setup.sh
 If you want to build or adjust the Chatbot UI. Go into UI, build new image and upload it to your registry:
 
 ```bash
-docker build . -t bponieckiklotz/llm-chatbot:kserve-v4
-docker push bponieckiklotz/llm-chatbot:kserve-v4
+docker build . -t natalytvinova/llm-chatbot:latest
+docker push natalytvinova/llm-chatbot:latest
 ```
 
+And replace the image in the `ui/setup.sh`.
 ## Cleanup
 
 Remove in the AWS cloud console:
@@ -297,10 +317,10 @@ rm -Rf ~/.local/share/juju/
 ##### Cloud costs
 Estimated costs for the usage of the public cloud with this setup as it is. 
 
-AWS / Compute (~4$/h | ~94$/d | ~656$/w | ~2815$/mo)
-- 3x t3.large (0.0832$/h)
-- 2x m7i.large (0.1008$/h)
-- 1x g5.2xlarge (1.212$/h)
+AWS / Compute (1.0853$/h | ~26$/d | ~182$/w | ~807$/mo)
+- 3x t3.large (0.0912$/Hour)
+- 2x m7i.large ( 0.11235$/Hour)
+- 1x g4dn.xlarge ( 0.587$/Hour)
 
 > WARN: DO NOT FORGET TO DESTROY THE ENVIRONMENT ONCE FINISHED.
 

@@ -5,15 +5,16 @@ applications:
     channel: 8.0/stable
     scale: 1
     trust: true
-    _github_repo_name: mysql-k8s-operator
+    constraints: mem=2G
+    _github_dependency_repo_name: mysql-k8s-operator
+    _github_dependency_repo_branch: main
   mlflow-server:
     charm: mlflow-server
-    channel: 2.15/stable
+    channel: 2.22/stable
     scale: 1
     trust: true
-    _github_repo_name: mlflow-operator
-    options:
-      enable_mlflow_nodeport: false
+    _github_dependency_repo_name: mlflow-operator
+    _github_dependency_repo_branch: main
   resource-dispatcher:
     charm: resource-dispatcher
     channel: 2.0/stable
@@ -31,7 +32,7 @@ relations:
 - [kserve-controller, minio]
 
 #COS integration
-# - [mlflow-server, grafana-dashboards]
-# - [mlflow-mysql, grafana-dashboards]
-# - [grafana-agent-k8s:metrics-endpoint, mlflow-server:metrics-endpoint]
-# - [grafana-agent-k8s:metrics-endpoint, mlflow-mysql:metrics-endpoint]
+- [mlflow-server, grafana-dashboards]
+- [mlflow-mysql, grafana-dashboards]
+- [grafana-agent-k8s:metrics-endpoint, mlflow-server:metrics-endpoint]
+- [grafana-agent-k8s:metrics-endpoint, mlflow-mysql:metrics-endpoint]

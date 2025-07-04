@@ -2,6 +2,7 @@ import streamlit as st
 import os
 
 from langchain_community.vectorstores import OpenSearchVectorSearch
+from langchain_core.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.globals import set_verbose, set_debug
 
@@ -26,7 +27,7 @@ def embeddings(model_name= "sentence-transformers/all-MiniLM-L6-v2", use_gpu=Fal
     return hfe
 
 def vector_search(
-    os_host, os_port, os_user, os_user_pass, 
+    os_host, os_port, os_user, os_user_pass,
     embedding_function, os_index_name = "rag_index"
 ):
     opensearch_vector_search = OpenSearchVectorSearch(
@@ -41,10 +42,10 @@ def vector_search(
     return opensearch_vector_search
 
 hfe = embeddings()
-    
+
 vs = vector_search(
     os_host=os.getenv('OPENSEARCH_HOST', "3.250.131.254"),
-    os_port=os.getenv('OPENSEARCH_PORT', 9200),
+    os_port=int(os.getenv('OPENSEARCH_PORT', 9200)),
     os_user=os.getenv('OPENSEARCH_USER', "admin"),
     os_user_pass=os.getenv('OPENSEARCH_PASSWORD', "admin"),
     embedding_function=hfe
@@ -52,13 +53,20 @@ vs = vector_search(
 
 llm = VLLMOpenAI(
     openai_api_key="EMPTY",
-    openai_api_base=os.getenv('LLM_API_URL', "http://10.152.183.118/v1/"),
-    model_name=os.getenv('LLM_MODEL_NAME', "meta/llama3-8b-instruct"),
+    openai_api_base=os.getenv('LLM_API_URL', "http://llama3-2-1b-predictor.admin.svc.cluster.local/v1/"),
+    model_name=os.getenv('LLM_MODEL_NAME', "/model"),
     max_tokens=256,
-    verbose=True
+    temperature=0.0,
+    verbose=True,
 )
 
-prompt = hub.pull("rlm/rag-prompt-llama")
+prompt = PromptTemplate.from_template(
+    "Answer the question below using only the provided context.\n"
+    "If the context does not contain the answer, say you don't know.\n\n"
+    "Context:\n{context}\n\n"
+    "Question:\n{question}\n\n"
+    "Answer:"
+)
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -79,6 +87,7 @@ def post_process_rag_ans(input_stream):
             yield formatted_documents
             yield "\n**Answer**:\n\n"
 
+
 rag_chain_from_docs = (
     RunnablePassthrough.assign(context=(lambda x: format_docs(x["context"])))
     | prompt
@@ -90,7 +99,7 @@ rag_chain_with_source = RunnableParallel(
     {"context": vs.as_retriever(), "question": RunnablePassthrough()}
 ).assign(answer=rag_chain_from_docs)
 
-st.title("Canonical and NVIDIA RAG Demo with NIMs", anchor=False)
+st.title("Canonical RAG Demo with vLLM", anchor=False)
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -108,11 +117,12 @@ if question := st.chat_input("Ask your question!", key="chatbot_main_area"):
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": question})
 
-    # # Display assistant response in chat message container
+    # Display assistant response in chat message container
     with st.chat_message("assistant"):
         response = st.write_stream(
             post_process_rag_ans(rag_chain_with_source.stream(question))
         )
+
     # Add assistant response to chat history
     st.session_state.messages.append(
         {"role": "assistant", "content": response}
