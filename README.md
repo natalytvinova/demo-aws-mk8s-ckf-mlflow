@@ -240,7 +240,7 @@ Check if KServe works by following the script `kserve-test.sh`. Update the authe
 bash ./models/setup.sh
 ```
 
-### Adjusting the model
+#### Adjusting the model
 
 If you want to make the modifications to the model, follow these steps. For this tutorial we used [Llama model 3.2-1B](https://huggingface.co/meta-llama/Llama-3.2-1B).
 After requesting access to this model, login to Huggingface-cli:
@@ -317,10 +317,10 @@ rm -Rf ~/.local/share/juju/
 ##### Cloud costs
 Estimated costs for the usage of the public cloud with this setup as it is. 
 
-AWS / Compute (1.0853$/h | ~26$/d | ~182$/w | ~807$/mo)
+AWS / Compute (~4$/h | ~94$/d | ~656$/w | ~2815$/mo)
 - 3x t3.large (0.0912$/Hour)
 - 2x m7i.large ( 0.11235$/Hour)
-- 1x g4dn.xlarge ( 0.587$/Hour)
+- 1x g5.2xlarge (1.212$/h)
 
 > WARN: DO NOT FORGET TO DESTROY THE ENVIRONMENT ONCE FINISHED.
 
